@@ -7,6 +7,7 @@ const fs = require("node:fs");
 const { createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } = require("node:crypto");
 const bcrypt = require("bcryptjs");
 const Database = require("better-sqlite3");
+const mongoose = require("mongoose");
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const session = require("express-session");
@@ -62,6 +63,21 @@ if (!/^[a-f0-9]{64}$/i.test(bankEncryptionKey)) {
     throw new Error("BANK_DETAILS_ENCRYPTION_KEY must be a 64-character hexadecimal key.");
 }
 bankEncryptionKey = Buffer.from(bankEncryptionKey, "hex");
+
+const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/finora";
+mongoose.set("strictQuery", true);
+
+async function connectMongo() {
+    try {
+        await mongoose.connect(mongoUri, {
+            serverSelectionTimeoutMS: 10000
+        });
+        console.log("MongoDB connected ✅");
+    } catch (error) {
+        console.error("MongoDB connection failed ❌", error.message);
+        throw error;
+    }
+}
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -1987,6 +2003,8 @@ app.use((error, req, res, next) => {
 });
 
 async function start() {
+    await connectMongo();
+
     const sessionCleanup = setInterval(() => {
         try {
             database.prepare("DELETE FROM sessions WHERE expires <= ?").run(Date.now());
